@@ -112,9 +112,9 @@ end
 
 def puts_pr_md(title, events, indent)
   spaces = '    '
-  print spaces * indent, "* #{title}\n" unless events.empty?
+  print spaces * indent, "- #{title}\n" unless events.empty?
   events.each do |pull_request|
-    item = "* "
+    item = "- "
     item << "[#{pull_request.payload.pull_request.title} "
     item << "by #{pull_request.payload.pull_request.user.login}"
     item << " · "
@@ -128,7 +128,7 @@ def puts_pr_md(title, events, indent)
 end
 nippo = Nippo.new
 
-puts '* pull_request' unless nippo.pull_requests.all.empty?
+puts '- pull_request' unless nippo.pull_requests.all.empty?
 puts_pr_md('merged', nippo.pull_requests.merged_at(Date.today), 1)
 puts_pr_md('rejected', nippo.pull_requests.unmerged_at(Date.today), 1)
 puts_pr_md('opened', nippo.pull_requests.opened_at(Date.today), 1)
