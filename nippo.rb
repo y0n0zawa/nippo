@@ -1,4 +1,5 @@
 require 'octokit'
+require 'pry'
 
 USER_NAME = ENV['NIPPO_GITHUB_USER_NAME']
 
@@ -7,12 +8,16 @@ class Nippo
     @pull_requests ||= PullRequests.new(all_user_events)
   end
 
+  def issues
+    @issues ||= Issues.new(all_user_events)
+  end
+
   def client
     @@client = Octokit::Client.new(login: USER_NAME, access_token: ENV['NIPPO_GITHUB_API_TOKEN'])
   end
 
   def all_user_events
-    @all_user_events ||= (user_events + user_public_events).uniq{|e| e.id}
+    @all_user_events ||= (user_events + user_public_events).uniq(&:id)
   end
 
   def user_events
@@ -28,13 +33,18 @@ class Nippo
       @events = events
     end
 
+    def all
+      list
+    end
+
     protected
+
     def list
-      @events.select{|event| event.type == self.type}
+      @events.select { |event| event.type == type }
     end
 
     def events_by_action(action)
-      list.select{|event| event.payload.action == action}
+      list.select { |event| event.payload.action == action }
     end
   end
 
@@ -72,6 +82,22 @@ class Nippo
     end
   end
 
+  class Issues < Events
+    include IssueBaseEvents
+
+    def type
+      'IssuesEvent'
+    end
+
+    def opened_at(date)
+      opened.select { |event| event.payload.issue.created_at.to_date == date }
+    end
+
+    def closed_at(date)
+      closed.select { |event| event.payload.issue.created_at.to_date == date }
+    end
+  end
+
   class PullRequests < Events
     include IssueBaseEvents
 
@@ -79,56 +105,62 @@ class Nippo
       'PullRequestEvent'
     end
 
-    def all
-      list
-    end
-
     def opened
-      exclude_ids = (merged + unmerged).map{|e| e.payload.pull_request.id}
-      super.select{|event| not exclude_ids.include?(event.payload.pull_request.id) }
+      exclude_ids = (merged + unmerged).map { |e| e.payload.pull_request.id }
+      super.select { |event| !exclude_ids.include?(event.payload.pull_request.id) }
     end
 
     def opened_at(date)
-      opened.select{|event| event.payload.pull_request.created_at.to_date == date }
+      opened.select { |event| event.payload.pull_request.created_at.to_date == date }
     end
 
     def merged
-      closed.select{|event| event.payload.pull_request.merged}
+      closed.select { |event| event.payload.pull_request.merged }
     end
 
     def merged_at(date)
-      merged.select{|event| event.payload.pull_request.merged_at.to_date == date}
+      merged.select { |event| event.payload.pull_request.merged_at.to_date == date }
     end
 
     def unmerged
-      closed.select{|event| !event.payload.pull_request.merged}
+      closed.select { |event| !event.payload.pull_request.merged }
     end
 
     def unmerged_at(date)
-      unmerged.select{|event| event.payload.pull_request.closed_at.to_date == date}
+      unmerged.select { |event| event.payload.pull_request.closed_at.to_date == date }
     end
   end
 end
 
-def puts_pr_md(title, events, indent)
+def puts_md(title, events, indent)
   spaces = '    '
   print spaces * indent, "- #{title}\n" unless events.empty?
-  events.each do |pull_request|
-    item = "- "
-    item << "[#{pull_request.payload.pull_request.title} "
-    item << "by #{pull_request.payload.pull_request.user.login}"
-    item << " · "
-    item << "Pull Request ##{pull_request.payload.pull_request.number}"
-    item << " · "
-    item << "#{pull_request.repo.name}]"
-    item << "(#{pull_request.payload.pull_request.html_url})"
+  events.each do |event|
+    payload = if event.type == Nippo.new.pull_requests.type
+                event.payload.pull_request
+              else
+                event.payload.issue
+              end
+    item = '- '
+    item << "[#{payload.title} "
+    item << "by #{payload.user.login}"
+    item << ' · '
+    item << "Pull Request ##{payload.number}"
+    item << ' · '
+    item << "#{event.repo.name}]"
+    item << "(#{payload.html_url})"
     item << "\n"
     print spaces * (indent + 1), item
   end
 end
+
 nippo = Nippo.new
 
 puts '- pull_request' unless nippo.pull_requests.all.empty?
-puts_pr_md('merged', nippo.pull_requests.merged_at(Date.today), 1)
-puts_pr_md('rejected', nippo.pull_requests.unmerged_at(Date.today), 1)
-puts_pr_md('opened', nippo.pull_requests.opened_at(Date.today), 1)
+puts_md('merged', nippo.pull_requests.merged_at(Date.today), 1)
+puts_md('rejected', nippo.pull_requests.unmerged_at(Date.today), 1)
+puts_md('opened', nippo.pull_requests.opened_at(Date.today), 1)
+
+puts '- issue' unless nippo.issues.all.empty?
+puts_md('closed', nippo.issues.closed_at(Date.today), 1)
+puts_md('opened', nippo.issues.opened_at(Date.today), 1)
