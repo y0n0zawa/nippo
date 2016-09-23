@@ -1,10 +1,15 @@
 require 'octokit'
+require 'pry'
 
 USER_NAME = ENV['NIPPO_GITHUB_USER_NAME']
 
 class Nippo
   def pull_requests
     @pull_requests ||= PullRequests.new(all_user_events)
+  end
+
+  def issues
+    @issues ||= Issues.new(all_user_events)
   end
 
   def client
@@ -26,6 +31,10 @@ class Nippo
   class Events
     def initialize(events)
       @events = events
+    end
+
+    def all
+      list
     end
 
     protected
@@ -73,15 +82,27 @@ class Nippo
     end
   end
 
+  class Issues < Events
+    include IssueBaseEvents
+
+    def type
+      'IssuesEvent'
+    end
+
+    def opened_at(date)
+      opened.select { |event| event.payload.issue.created_at.to_date == date }
+    end
+
+    def closed_at(date)
+      closed.select { |event| event.payload.issue.created_at.to_date == date }
+    end
+  end
+
   class PullRequests < Events
     include IssueBaseEvents
 
     def type
       'PullRequestEvent'
-    end
-
-    def all
-      list
     end
 
     def opened
@@ -127,9 +148,30 @@ def puts_pr_md(title, events, indent)
     print spaces * (indent + 1), item
   end
 end
+
+def puts_issue_md(title, events, indent)
+  spaces = '    '
+  print spaces * indent, "- #{title}\n" unless events.empty?
+  events.each do |issue|
+    item = '- '
+    item << "[#{issue.payload.issue.title} "
+    item << "by #{issue.payload.issue.user.login}"
+    item << ' · '
+    item << "Issue ##{issue.payload.issue.number}"
+    item << ' · '
+    item << "#{issue.repo.name}]"
+    item << "(#{issue.payload.issue.html_url})"
+    item << "\n"
+    print spaces * (indent + 1), item
+  end
+end
 nippo = Nippo.new
 
 puts '- pull_request' unless nippo.pull_requests.all.empty?
 puts_pr_md('merged', nippo.pull_requests.merged_at(Date.today), 1)
 puts_pr_md('rejected', nippo.pull_requests.unmerged_at(Date.today), 1)
 puts_pr_md('opened', nippo.pull_requests.opened_at(Date.today), 1)
+
+puts '- issue' unless nippo.issues.all.empty?
+puts_issue_md('closed', nippo.issues.closed_at(Date.today), 1)
+puts_issue_md('opened', nippo.issues.opened_at(Date.today), 1)
