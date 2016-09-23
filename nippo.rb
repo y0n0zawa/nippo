@@ -132,46 +132,35 @@ class Nippo
   end
 end
 
-def puts_pr_md(title, events, indent)
+def puts_md(title, events, indent)
   spaces = '    '
   print spaces * indent, "- #{title}\n" unless events.empty?
-  events.each do |pull_request|
+  events.each do |event|
+    payload = if event.type == Nippo.new.pull_requests.type
+                event.payload.pull_request
+              else
+                event.payload.issue
+              end
     item = '- '
-    item << "[#{pull_request.payload.pull_request.title} "
-    item << "by #{pull_request.payload.pull_request.user.login}"
+    item << "[#{payload.title} "
+    item << "by #{payload.user.login}"
     item << ' · '
-    item << "Pull Request ##{pull_request.payload.pull_request.number}"
+    item << "Pull Request ##{payload.number}"
     item << ' · '
-    item << "#{pull_request.repo.name}]"
-    item << "(#{pull_request.payload.pull_request.html_url})"
+    item << "#{event.repo.name}]"
+    item << "(#{payload.html_url})"
     item << "\n"
     print spaces * (indent + 1), item
   end
 end
 
-def puts_issue_md(title, events, indent)
-  spaces = '    '
-  print spaces * indent, "- #{title}\n" unless events.empty?
-  events.each do |issue|
-    item = '- '
-    item << "[#{issue.payload.issue.title} "
-    item << "by #{issue.payload.issue.user.login}"
-    item << ' · '
-    item << "Issue ##{issue.payload.issue.number}"
-    item << ' · '
-    item << "#{issue.repo.name}]"
-    item << "(#{issue.payload.issue.html_url})"
-    item << "\n"
-    print spaces * (indent + 1), item
-  end
-end
 nippo = Nippo.new
 
 puts '- pull_request' unless nippo.pull_requests.all.empty?
-puts_pr_md('merged', nippo.pull_requests.merged_at(Date.today), 1)
-puts_pr_md('rejected', nippo.pull_requests.unmerged_at(Date.today), 1)
-puts_pr_md('opened', nippo.pull_requests.opened_at(Date.today), 1)
+puts_md('merged', nippo.pull_requests.merged_at(Date.today), 1)
+puts_md('rejected', nippo.pull_requests.unmerged_at(Date.today), 1)
+puts_md('opened', nippo.pull_requests.opened_at(Date.today), 1)
 
 puts '- issue' unless nippo.issues.all.empty?
-puts_issue_md('closed', nippo.issues.closed_at(Date.today), 1)
-puts_issue_md('opened', nippo.issues.opened_at(Date.today), 1)
+puts_md('closed', nippo.issues.closed_at(Date.today), 1)
+puts_md('opened', nippo.issues.opened_at(Date.today), 1)
