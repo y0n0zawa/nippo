@@ -12,7 +12,7 @@ class Nippo
   end
 
   def all_user_events
-    @all_user_events ||= (user_events + user_public_events).uniq{|e| e.id}
+    @all_user_events ||= (user_events + user_public_events).uniq(&:id)
   end
 
   def user_events
@@ -29,12 +29,13 @@ class Nippo
     end
 
     protected
+
     def list
-      @events.select{|event| event.type == self.type}
+      @events.select { |event| event.type == type }
     end
 
     def events_by_action(action)
-      list.select{|event| event.payload.action == action}
+      list.select { |event| event.payload.action == action }
     end
   end
 
@@ -84,28 +85,28 @@ class Nippo
     end
 
     def opened
-      exclude_ids = (merged + unmerged).map{|e| e.payload.pull_request.id}
-      super.select{|event| not exclude_ids.include?(event.payload.pull_request.id) }
+      exclude_ids = (merged + unmerged).map { |e| e.payload.pull_request.id }
+      super.select { |event| !exclude_ids.include?(event.payload.pull_request.id) }
     end
 
     def opened_at(date)
-      opened.select{|event| event.payload.pull_request.created_at.to_date == date }
+      opened.select { |event| event.payload.pull_request.created_at.to_date == date }
     end
 
     def merged
-      closed.select{|event| event.payload.pull_request.merged}
+      closed.select { |event| event.payload.pull_request.merged }
     end
 
     def merged_at(date)
-      merged.select{|event| event.payload.pull_request.merged_at.to_date == date}
+      merged.select { |event| event.payload.pull_request.merged_at.to_date == date }
     end
 
     def unmerged
-      closed.select{|event| !event.payload.pull_request.merged}
+      closed.select { |event| !event.payload.pull_request.merged }
     end
 
     def unmerged_at(date)
-      unmerged.select{|event| event.payload.pull_request.closed_at.to_date == date}
+      unmerged.select { |event| event.payload.pull_request.closed_at.to_date == date }
     end
   end
 end
@@ -114,12 +115,12 @@ def puts_pr_md(title, events, indent)
   spaces = '    '
   print spaces * indent, "- #{title}\n" unless events.empty?
   events.each do |pull_request|
-    item = "- "
+    item = '- '
     item << "[#{pull_request.payload.pull_request.title} "
     item << "by #{pull_request.payload.pull_request.user.login}"
-    item << " · "
+    item << ' · '
     item << "Pull Request ##{pull_request.payload.pull_request.number}"
-    item << " · "
+    item << ' · '
     item << "#{pull_request.repo.name}]"
     item << "(#{pull_request.payload.pull_request.html_url})"
     item << "\n"
